@@ -14,6 +14,10 @@
 >
 > Original repo: https://github.com/NVIDIA/NemoClaw
 
+## Architecture Overview
+
+![NemoClaw High-Level Architecture](docs/architecture_diagram.jpg)
+
 ---
 
 # NVIDIA NemoClaw: OpenClaw Plugin for OpenShell
